@@ -1,6 +1,7 @@
 package com.example.gradwork_backend.service;
 
 import com.example.gradwork_backend.dto.AddFriendRequest;
+import com.example.gradwork_backend.dto.FriendListResponse;
 import com.example.gradwork_backend.dto.LoginRequest;
 import com.example.gradwork_backend.dto.RegisterRequest;
 import com.example.gradwork_backend.dto.RemoveFriendRequest;
@@ -11,6 +12,9 @@ import com.example.gradwork_backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class UserService {
@@ -78,5 +82,20 @@ public class UserService {
         }
 
         friendRepository.deleteByUserAndFriend(user, friend);
+    }
+
+    @Transactional(readOnly = true)
+    public FriendListResponse getFriends(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        List<Friend> friendships = friendRepository.findByUser(user);
+        List<String> friendUsernames = friendships.stream()
+                .map(friendship -> friendship.getFriend().getUsername())
+                .collect(Collectors.toList());
+
+        FriendListResponse response = new FriendListResponse();
+        response.setFriends(friendUsernames);
+        return response;
     }
 }
