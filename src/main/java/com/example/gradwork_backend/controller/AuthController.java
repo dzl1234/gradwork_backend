@@ -12,6 +12,16 @@ import com.example.gradwork_backend.vo.ResultVo;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.example.gradwork_backend.dto.MessageResponse;
+import com.example.gradwork_backend.dto.SendMessageRequest;
+import com.example.gradwork_backend.enums.ResultEnums;
+import com.example.gradwork_backend.service.UserService;
+import com.example.gradwork_backend.vo.ResultVo;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -89,6 +99,33 @@ public class AuthController {
         try {
             FriendListResponse response = userService.getFriends(username);
             return ResponseEntity.ok(ResultVo.getSuccess(ResultEnums.SUCCESS.Code(), ResultEnums.SUCCESS.Desc(), response));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(400).body(ResultVo.getFail(ResultEnums.ENTITY_NOT_EXIST.Code(), ResultEnums.ENTITY_NOT_EXIST.Desc()));
+        }
+    }
+
+    @PostMapping("/message/send")
+    public ResponseEntity<ResultVo<String>> sendMessage(@RequestBody SendMessageRequest request) {
+        try {
+            userService.sendMessage(request);
+            return ResponseEntity.ok(ResultVo.getSuccess(ResultEnums.SUCCESS.Code(), ResultEnums.SUCCESS.Desc(), "Message sent successfully"));
+        } catch (IllegalArgumentException e) {
+            if ("Sender not found".equals(e.getMessage()) || "Receiver not found".equals(e.getMessage())) {
+                return ResponseEntity.status(400).body(ResultVo.getFail(ResultEnums.ENTITY_NOT_EXIST.Code(), ResultEnums.ENTITY_NOT_EXIST.Desc()));
+            } else if ("Receiver is not a friend".equals(e.getMessage())) {
+                return ResponseEntity.status(400).body(ResultVo.getFail(ResultEnums.ERROR_NO_RECORD.Code(), "Receiver is not a friend"));
+            } else {
+                return ResponseEntity.status(400).body(ResultVo.getFail(ResultEnums.ERROR_UNKNOWN.Code(), e.getMessage()));
+            }
+        }
+    }
+
+    @GetMapping("/message/list")
+    public ResponseEntity<ResultVo<List<MessageResponse>>> getMessages(
+            @RequestParam String username, @RequestParam String friendUsername) {
+        try {
+            List<MessageResponse> messages = userService.getMessages(username, friendUsername);
+            return ResponseEntity.ok(ResultVo.getSuccess(ResultEnums.SUCCESS.Code(), ResultEnums.SUCCESS.Desc(), messages));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(400).body(ResultVo.getFail(ResultEnums.ENTITY_NOT_EXIST.Code(), ResultEnums.ENTITY_NOT_EXIST.Desc()));
         }

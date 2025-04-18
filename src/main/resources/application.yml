@@ -14,3 +14,8 @@ spring:
 
 server:
   port: 8080
+
+baidu:
+  translate:
+    app-id: 20250223002282614
+    secret-key: RVfwPzV9ajNE1Vk64Vrw

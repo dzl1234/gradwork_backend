@@ -12,10 +12,14 @@ import com.example.gradwork_backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.util.List;
 import java.util.stream.Collectors;
-
+import java.time.LocalDateTime;
+import com.example.gradwork_backend.util.BaiduTranslateClient;
+import com.example.gradwork_backend.repository.MessageRepository;
+import com.example.gradwork_backend.dto.MessageResponse;
+import com.example.gradwork_backend.dto.SendMessageRequest;
+import com.example.gradwork_backend.entity.Message;
 @Service
 public class UserService {
 
@@ -25,6 +29,11 @@ public class UserService {
     @Autowired
     private FriendRepository friendRepository;
 
+    @Autowired
+    private MessageRepository messageRepository;
+
+    @Autowired
+    private BaiduTranslateClient baiduTranslateClient;
     @Transactional
     public void register(RegisterRequest request) {
         if (userRepository.findByUsername(request.getUsername()).isPresent()) {
@@ -98,4 +107,53 @@ public class UserService {
         response.setFriends(friendUsernames);
         return response;
     }
+
+    @Transactional
+    public void sendMessage(SendMessageRequest request) {
+        User sender = userRepository.findByUsername(request.getSenderUsername())
+                .orElseThrow(() -> new IllegalArgumentException("Sender not found"));
+        User receiver = userRepository.findByUsername(request.getReceiverUsername())
+                .orElseThrow(() -> new IllegalArgumentException("Receiver not found"));
+
+        // 验证是否为好友
+        if (!friendRepository.findByUserAndFriend(sender, receiver).isPresent()) {
+            throw new IllegalArgumentException("Receiver is not a friend");
+        }
+
+        // 翻译消息内容
+        String translatedContent;
+        try {
+            translatedContent = baiduTranslateClient.translateToEnglish(request.getContent());
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Translation failed: " + e.getMessage());
+        }
+
+        // 保存消息
+        Message message = new Message();
+        message.setSender(sender);
+        message.setReceiver(receiver);
+        message.setContent(request.getContent());
+        message.setTranslatedContent(translatedContent);
+        message.setSendTime(LocalDateTime.now());
+        messageRepository.save(message);
+    }
+
+    @Transactional(readOnly = true)
+    public List<MessageResponse> getMessages(String username, String friendUsername) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        User friend = userRepository.findByUsername(friendUsername)
+                .orElseThrow(() -> new IllegalArgumentException("Friend not found"));
+
+        // 查询双向消息
+        List<Message> messages = messageRepository.findBySenderAndReceiverOrReceiverAndSender(user, friend, user, friend);
+        return messages.stream().map(message -> {
+            MessageResponse response = new MessageResponse();
+            response.setSenderUsername(message.getSender().getUsername());
+            response.setReceiverUsername(message.getReceiver().getUsername());
+            response.setContent(message.getContent());
+            response.setTranslatedContent(message.getTranslatedContent());
+            response.setSendTime(message.getSendTime());
+            return response;
+        }).collect(Collectors.toList());}
 }
