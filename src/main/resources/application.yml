@@ -19,3 +19,10 @@ baidu:
   translate:
     app-id: 20250223002282614
     secret-key: RVfwPzV9ajNE1Vk64Vrw
+
+sparkdesk:
+  ai:
+    app-id: 83e6559f
+    api-key: bbecc0fe2282067ce6d88926b2c278ba
+    api-secret: ZjYxMjM5YTJkNTFhY2U3MTYyMDJiOTk3
+    url: https://spark-api.xf-yun.com/v2.1/chat

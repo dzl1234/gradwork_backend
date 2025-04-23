@@ -145,15 +145,17 @@ public class UserService {
         User friend = userRepository.findByUsername(friendUsername)
                 .orElseThrow(() -> new IllegalArgumentException("Friend not found"));
 
-        // 查询双向消息
-        List<Message> messages = messageRepository.findBySenderAndReceiverOrReceiverAndSender(user, friend, user, friend);
+        List<Message> messages = messageRepository.findBySenderAndReceiverOrReceiverAndSender(user, friend);
+
         return messages.stream().map(message -> {
             MessageResponse response = new MessageResponse();
+            response.setId(message.getId());
             response.setSenderUsername(message.getSender().getUsername());
             response.setReceiverUsername(message.getReceiver().getUsername());
             response.setContent(message.getContent());
             response.setTranslatedContent(message.getTranslatedContent());
             response.setSendTime(message.getSendTime());
             return response;
-        }).collect(Collectors.toList());}
+        }).collect(Collectors.toList());
+    }
 }

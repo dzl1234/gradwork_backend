@@ -64,6 +64,7 @@ public class AuthController {
 
     @PostMapping("/friends/add")
     public ResponseEntity<ResultVo<String>> addFriend(@RequestBody AddFriendRequest request) {
+        System.out.print(request);
         try {
             userService.addFriend(request);
             return ResponseEntity.ok(ResultVo.getSuccess(ResultEnums.SUCCESS.Code(), ResultEnums.SUCCESS.Desc(), "Friend added successfully"));
