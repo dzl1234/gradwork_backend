@@ -9,6 +9,7 @@ import com.example.gradwork_backend.entity.Friend;
 import com.example.gradwork_backend.entity.User;
 import com.example.gradwork_backend.repository.FriendRepository;
 import com.example.gradwork_backend.repository.UserRepository;
+import com.example.gradwork_backend.util.SparkDeskClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +35,9 @@ public class UserService {
 
     @Autowired
     private BaiduTranslateClient baiduTranslateClient;
+
+    @Autowired
+    private SparkDeskClient sparkDeskClient;
     @Transactional
     public void register(RegisterRequest request) {
         if (userRepository.findByUsername(request.getUsername()).isPresent()) {
@@ -157,5 +161,13 @@ public class UserService {
             response.setSendTime(message.getSendTime());
             return response;
         }).collect(Collectors.toList());
+    }
+
+    public String askAi(String question) {
+        try {
+            return sparkDeskClient.ask(question);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("AI request failed: " + e.getMessage());
+        }
     }
 }

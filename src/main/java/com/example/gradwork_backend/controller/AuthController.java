@@ -1,19 +1,12 @@
 package com.example.gradwork_backend.controller;
 
-import com.example.gradwork_backend.dto.AddFriendRequest;
-import com.example.gradwork_backend.dto.FriendListResponse;
-import com.example.gradwork_backend.dto.LoginRequest;
-import com.example.gradwork_backend.dto.LoginResponse;
-import com.example.gradwork_backend.dto.RegisterRequest;
-import com.example.gradwork_backend.dto.RemoveFriendRequest;
+import com.example.gradwork_backend.dto.*;
 import com.example.gradwork_backend.enums.ResultEnums;
 import com.example.gradwork_backend.service.UserService;
 import com.example.gradwork_backend.vo.ResultVo;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import com.example.gradwork_backend.dto.MessageResponse;
-import com.example.gradwork_backend.dto.SendMessageRequest;
 import com.example.gradwork_backend.enums.ResultEnums;
 import com.example.gradwork_backend.service.UserService;
 import com.example.gradwork_backend.vo.ResultVo;
@@ -64,7 +57,6 @@ public class AuthController {
 
     @PostMapping("/friends/add")
     public ResponseEntity<ResultVo<String>> addFriend(@RequestBody AddFriendRequest request) {
-        System.out.print(request);
         try {
             userService.addFriend(request);
             return ResponseEntity.ok(ResultVo.getSuccess(ResultEnums.SUCCESS.Code(), ResultEnums.SUCCESS.Desc(), "Friend added successfully"));
@@ -129,6 +121,16 @@ public class AuthController {
             return ResponseEntity.ok(ResultVo.getSuccess(ResultEnums.SUCCESS.Code(), ResultEnums.SUCCESS.Desc(), messages));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(400).body(ResultVo.getFail(ResultEnums.ENTITY_NOT_EXIST.Code(), ResultEnums.ENTITY_NOT_EXIST.Desc()));
+        }
+    }
+
+    @PostMapping("/ai/ask")
+    public ResponseEntity<ResultVo<String>> askAi(@RequestBody AiAskRequest request) {
+        try {
+            String answer = userService.askAi(request.getQuestion());
+            return ResponseEntity.ok(ResultVo.getSuccess(ResultEnums.SUCCESS.Code(), ResultEnums.SUCCESS.Desc(), answer));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(400).body(ResultVo.getFail(ResultEnums.ERROR_UNKNOWN.Code(), e.getMessage()));
         }
     }
 }
