@@ -31,7 +31,7 @@ public class ResultVo<T> {
     public static <T> ResultVo getSuccess(Integer code, String msg, T data) {
         return new ResultVo<>(code, msg, data);
     }
-
+    //获取和设置字段值
     public Integer getCode() {
         return code;
     }

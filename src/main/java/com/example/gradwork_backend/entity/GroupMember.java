@@ -3,26 +3,21 @@ package com.example.gradwork_backend.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 
+
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "ai_conversations")
+@Table(name = "group_members")
 @Data
-public class AiConversation {
+public class GroupMember {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
+    @ManyToOne
+    @JoinColumn(name = "group_id", nullable = false)
+    private Group group;
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
-
-    @Column(nullable = false)
-    private String question;
-
-    @Column(nullable = false, columnDefinition = "TEXT")
-    private String answer;
-
-    @Column(nullable = false)
-    private LocalDateTime timestamp;
+    private LocalDateTime joinedAt;
 }

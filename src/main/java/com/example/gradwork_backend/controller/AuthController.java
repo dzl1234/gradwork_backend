@@ -100,7 +100,7 @@ public class AuthController {
     @PostMapping("/message/send")
     public ResponseEntity<ResultVo<String>> sendMessage(@RequestBody SendMessageRequest request) {
         try {
-            userService.sendMessage(request);
+            userService.sendMessage(request);// 调用userService的sendMessage方法发送消息
             return ResponseEntity.ok(ResultVo.getSuccess(ResultEnums.SUCCESS.Code(), ResultEnums.SUCCESS.Desc(), "Message sent successfully"));
         } catch (IllegalArgumentException e) {
             if ("Sender not found".equals(e.getMessage()) || "Receiver not found".equals(e.getMessage())) {
@@ -125,12 +125,23 @@ public class AuthController {
     }
 
     @PostMapping("/ai/ask")
-    public ResponseEntity<ResultVo<String>> askAi(@RequestBody AiAskRequest request) {
+    public ResponseEntity<ResultVo<String>> askAi(@RequestBody AiAskRequest request,
+                                                  @RequestParam String username) {
         try {
-            String answer = userService.askAi(request.getQuestion());
+            String answer = userService.askAi(request.getQuestion(), username);
             return ResponseEntity.ok(ResultVo.getSuccess(ResultEnums.SUCCESS.Code(), ResultEnums.SUCCESS.Desc(), answer));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(400).body(ResultVo.getFail(ResultEnums.ERROR_UNKNOWN.Code(), e.getMessage()));
+        }
+    }
+
+    @GetMapping("/ai/history")
+    public ResponseEntity<ResultVo<List<AiConversationResponse>>> getAiHistory(@RequestParam String username) {
+        try {
+            List<AiConversationResponse> history = userService.getAiHistory(username);
+            return ResponseEntity.ok(ResultVo.getSuccess(ResultEnums.SUCCESS.Code(), ResultEnums.SUCCESS.Desc(), history));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(400).body(ResultVo.getFail(ResultEnums.ENTITY_NOT_EXIST.Code(), ResultEnums.ENTITY_NOT_EXIST.Desc()));
         }
     }
 }

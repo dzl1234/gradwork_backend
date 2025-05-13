@@ -1,28 +1,20 @@
 package com.example.gradwork_backend.entity;
-
 import jakarta.persistence.*;
 import lombok.Data;
 
 import java.time.LocalDateTime;
-
 @Entity
-@Table(name = "ai_conversations")
+@Table(name = "notifications")
 @Data
-public class AiConversation {
+public class Notification {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
-
-    @Column(nullable = false)
-    private String question;
-
-    @Column(nullable = false, columnDefinition = "TEXT")
-    private String answer;
-
-    @Column(nullable = false)
-    private LocalDateTime timestamp;
+    private String type;
+    private String content;
+    private Boolean isRead;
+    private LocalDateTime createdAt;
 }

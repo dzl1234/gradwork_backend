@@ -1,5 +1,7 @@
 package com.example.gradwork_backend.service;
 
+import com.example.gradwork_backend.dto.*;
+import com.example.gradwork_backend.entity.AiConversation;
 import com.example.gradwork_backend.dto.AddFriendRequest;
 import com.example.gradwork_backend.dto.FriendListResponse;
 import com.example.gradwork_backend.dto.LoginRequest;
@@ -21,6 +23,7 @@ import com.example.gradwork_backend.repository.MessageRepository;
 import com.example.gradwork_backend.dto.MessageResponse;
 import com.example.gradwork_backend.dto.SendMessageRequest;
 import com.example.gradwork_backend.entity.Message;
+import com.example.gradwork_backend.repository.AiConversationRepository;
 @Service
 public class UserService {
 
@@ -33,6 +36,8 @@ public class UserService {
     @Autowired
     private MessageRepository messageRepository;
 
+    @Autowired
+    private AiConversationRepository aiConversationRepository;
     @Autowired
     private BaiduTranslateClient baiduTranslateClient;
 
@@ -101,13 +106,15 @@ public class UserService {
     public FriendListResponse getFriends(String username) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
-
+        // 从朋友仓库中查找该用户的所有朋友
         List<Friend> friendships = friendRepository.findByUser(user);
+        // 将朋友列表转换为用户名列表
         List<String> friendUsernames = friendships.stream()
                 .map(friendship -> friendship.getFriend().getUsername())
                 .collect(Collectors.toList());
-
+        // 创建响应对象
         FriendListResponse response = new FriendListResponse();
+        // 设置朋友列表到响应对象中
         response.setFriends(friendUsernames);
         return response;
     }
@@ -148,9 +155,9 @@ public class UserService {
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
         User friend = userRepository.findByUsername(friendUsername)
                 .orElseThrow(() -> new IllegalArgumentException("Friend not found"));
-
+        // 通过用户和好友查找消息
         List<Message> messages = messageRepository.findBySenderAndReceiverOrReceiverAndSender(user, friend);
-
+        // 将消息转换为响应对象并返回
         return messages.stream().map(message -> {
             MessageResponse response = new MessageResponse();
             response.setId(message.getId());
@@ -159,6 +166,44 @@ public class UserService {
             response.setContent(message.getContent());
             response.setTranslatedContent(message.getTranslatedContent());
             response.setSendTime(message.getSendTime());
+            return response;
+        }).collect(Collectors.toList());
+    }
+    @Transactional
+    public String askAi(String question, String username) { // 添加 username 参数
+        try {
+            // 查找用户
+            User user = userRepository.findByUsername(username)
+                    .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+            // 调用星火 AI 获取回答
+            String answer = sparkDeskClient.ask(question);
+
+            // 保存问答记录
+            AiConversation conversation = new AiConversation();
+            conversation.setUser(user);
+            conversation.setQuestion(question);
+            conversation.setAnswer(answer);
+            conversation.setTimestamp(LocalDateTime.now());
+            aiConversationRepository.save(conversation);
+
+            return answer;
+        } catch (Exception e) {
+            throw new IllegalArgumentException("AI request failed: " + e.getMessage());
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public List<AiConversationResponse> getAiHistory(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        List<AiConversation> conversations = aiConversationRepository.findByUserOrderByTimestampAsc(user);
+        return conversations.stream().map(conversation -> {
+            AiConversationResponse response = new AiConversationResponse();
+            response.setId(conversation.getId());
+            response.setQuestion(conversation.getQuestion());
+            response.setAnswer(conversation.getAnswer());
+            response.setTimestamp(conversation.getTimestamp());
             return response;
         }).collect(Collectors.toList());
     }
