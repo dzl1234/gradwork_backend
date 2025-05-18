@@ -1,29 +1,18 @@
 package com.example.gradwork_backend.service;
 
 import com.example.gradwork_backend.dto.*;
-import com.example.gradwork_backend.entity.AiConversation;
-import com.example.gradwork_backend.dto.AddFriendRequest;
-import com.example.gradwork_backend.dto.FriendListResponse;
-import com.example.gradwork_backend.dto.LoginRequest;
-import com.example.gradwork_backend.dto.RegisterRequest;
-import com.example.gradwork_backend.dto.RemoveFriendRequest;
-import com.example.gradwork_backend.entity.Friend;
-import com.example.gradwork_backend.entity.User;
-import com.example.gradwork_backend.repository.FriendRepository;
-import com.example.gradwork_backend.repository.UserRepository;
+import com.example.gradwork_backend.entity.*;
+import com.example.gradwork_backend.repository.*;
+import com.example.gradwork_backend.util.BaiduTranslateClient;
 import com.example.gradwork_backend.util.SparkDeskClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
-import java.time.LocalDateTime;
-import com.example.gradwork_backend.util.BaiduTranslateClient;
-import com.example.gradwork_backend.repository.MessageRepository;
-import com.example.gradwork_backend.dto.MessageResponse;
-import com.example.gradwork_backend.dto.SendMessageRequest;
-import com.example.gradwork_backend.entity.Message;
-import com.example.gradwork_backend.repository.AiConversationRepository;
+
 @Service
 public class UserService {
 
@@ -38,6 +27,16 @@ public class UserService {
 
     @Autowired
     private AiConversationRepository aiConversationRepository;
+
+    @Autowired
+    private GroupRepository groupRepository;
+
+    @Autowired
+    private GroupMemberRepository groupMemberRepository;
+
+    @Autowired
+    private GroupMessageRepository groupMessageRepository;
+
     @Autowired
     private BaiduTranslateClient baiduTranslateClient;
 
@@ -193,6 +192,13 @@ public class UserService {
         }
     }
 
+    public String askAi(String question) {
+        try {
+            return sparkDeskClient.ask(question);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("AI request failed: " + e.getMessage());
+        }
+    }
     @Transactional(readOnly = true)
     public List<AiConversationResponse> getAiHistory(String username) {
         User user = userRepository.findByUsername(username)
@@ -207,12 +213,122 @@ public class UserService {
             return response;
         }).collect(Collectors.toList());
     }
-
-    public String askAi(String question) {
-        try {
-            return sparkDeskClient.ask(question);
-        } catch (Exception e) {
-            throw new IllegalArgumentException("AI request failed: " + e.getMessage());
+    public void createGroup(CreateGroupRequest request) {
+        // 检查群聊名称是否已存在
+        if (groupRepository.findByName(request.getGroupName()).isPresent()) {
+            throw new IllegalArgumentException("Group name already exists");
         }
+
+        User creator = userRepository.findByUsername(request.getUsername())
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        Group group = new Group();
+        group.setName(request.getGroupName());
+        group.setCreatedAt(LocalDateTime.now());
+        groupRepository.save(group);
+
+        // 仅添加创建者作为群成员
+        GroupMember creatorMember = new GroupMember();
+        creatorMember.setGroup(group);
+        creatorMember.setUser(creator);
+        groupMemberRepository.save(creatorMember);
+    }
+
+
+    @Transactional
+    public void joinGroup(JoinGroupRequest request) {
+        User user = userRepository.findByUsername(request.getUsername())
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        Group group = groupRepository.findByName(request.getGroupName())
+                .orElseThrow(() -> new IllegalArgumentException("Group not found"));
+
+        if (groupMemberRepository.findByGroupAndUser(group, user).isPresent()) {
+            throw new IllegalArgumentException("User is already a member of the group");
+        }
+
+        GroupMember groupMember = new GroupMember();
+        groupMember.setGroup(group);
+        groupMember.setUser(user);
+        groupMemberRepository.save(groupMember);
+    }
+
+    @Transactional
+    public void leaveGroup(LeaveGroupRequest request) {
+        User user = userRepository.findByUsername(request.getUsername())
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        Group group = groupRepository.findById(request.getGroupId())
+                .orElseThrow(() -> new IllegalArgumentException("Group not found"));
+
+        if (groupMemberRepository.findByGroupAndUser(group, user).isEmpty()) {
+            throw new IllegalArgumentException("User is not a member of the group");
+        }
+
+        groupMemberRepository.deleteByGroupAndUser(group, user);
+    }
+
+    @Transactional
+    public void sendGroupMessage(SendGroupMessageRequest request) {
+        User sender = userRepository.findByUsername(request.getSenderUsername())
+                .orElseThrow(() -> new IllegalArgumentException("Sender not found"));
+        Group group = groupRepository.findByName(request.getGroupName())
+                .orElseThrow(() -> new IllegalArgumentException("Group not found"));
+
+        if (groupMemberRepository.findByGroupAndUser(group, sender).isEmpty()) {
+            throw new IllegalArgumentException("Sender is not a member of the group");
+        }
+
+        String translatedContent;
+        try {
+            translatedContent = baiduTranslateClient.translateToEnglish(request.getContent());
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Translation failed: " + e.getMessage());
+        }
+
+        GroupMessage message = new GroupMessage();
+        message.setGroup(group);
+        message.setSender(sender);
+        message.setContent(request.getContent());
+        message.setTranslatedContent(translatedContent);
+        message.setSendTime(LocalDateTime.now());
+        groupMessageRepository.save(message);
+    }
+
+    @Transactional(readOnly = true)
+    public List<GroupMessageResponse> getGroupMessages(String username, String groupName) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        Group group = groupRepository.findByName(groupName)
+                .orElseThrow(() -> new IllegalArgumentException("Group not found"));
+
+        if (groupMemberRepository.findByGroupAndUser(group, user).isEmpty()) {
+            throw new IllegalArgumentException("User is not a member of the group");
+        }
+
+        List<GroupMessage> messages = groupMessageRepository.findByGroupOrderBySendTimeAsc(group);
+        return messages.stream().map(message -> {
+            GroupMessageResponse response = new GroupMessageResponse();
+            response.setId(message.getId());
+            response.setGroupId(message.getGroup().getId());
+            response.setSenderUsername(message.getSender().getUsername());
+            response.setContent(message.getContent());
+            response.setTranslatedContent(message.getTranslatedContent());
+            response.setSendTime(message.getSendTime());
+            return response;
+        }).collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<GroupListResponse> getUserGroups(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        List<GroupMember> memberships = groupMemberRepository.findByUser(user);
+        return memberships.stream().map(membership -> {
+            GroupListResponse response = new GroupListResponse();
+            response.setGroupId(membership.getGroup().getId());
+            response.setGroupName(membership.getGroup().getName());
+            response.setCreatedAt(membership.getGroup().getCreatedAt());
+            return response;
+        }).collect(Collectors.toList());
     }
 }
